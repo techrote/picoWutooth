@@ -11,6 +11,14 @@
 #define BOARD_TUD_MAX_SPEED OPT_MODE_DEFAULT_SPEED
 #endif
 
+#if BOARD_TUD_RHPORT == 0
+#define CFG_TUSB_RHPORT0_MODE (OPT_MODE_DEVICE | BOARD_TUD_MAX_SPEED)
+#elif BOARD_TUD_RHPORT == 1
+#define CFG_TUSB_RHPORT1_MODE (OPT_MODE_DEVICE | BOARD_TUD_MAX_SPEED)
+#else
+#error Unsupported TinyUSB device root-hub port
+#endif
+
 #ifndef CFG_TUSB_MCU
 #error CFG_TUSB_MCU must be defined by the Pico SDK TinyUSB integration
 #endif
