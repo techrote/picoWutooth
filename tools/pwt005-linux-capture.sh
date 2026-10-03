@@ -17,7 +17,7 @@ Usage:
   tools/pwt005-linux-capture.sh [options]
 
 Options:
-  --output DIR              Evidence output directory.
+  --output DIR              Raw capture output directory.
   --uf2 PATH                UF2 file that was flashed; records SHA-256.
   --hci hciN                Force the target HCI device instead of sysfs detection.
   --device XX:XX:XX:XX:XX:XX
@@ -64,7 +64,7 @@ esac
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 if [[ -z "$OUTPUT_ROOT" ]]; then
-    OUTPUT_ROOT="evidence/PWT-005/runs/${timestamp}-${PHASE}"
+    OUTPUT_ROOT="artifacts/PWT-005/runs/${timestamp}-${PHASE}"
 fi
 mkdir -p "$OUTPUT_ROOT"
 
@@ -200,7 +200,7 @@ if [[ -z "$HCI" || ! -d "/sys/class/bluetooth/$HCI" ]]; then
     record driver_binding "NOT_FOUND"
     capture_kernel "kernel-log.txt"
     echo "No Bluetooth HCI device for USB ${VID}:${PID} was found." >&2
-    echo "Evidence retained in $OUTPUT_ROOT" >&2
+    echo "Raw capture retained in $OUTPUT_ROOT" >&2
     exit 3
 fi
 
@@ -309,4 +309,4 @@ trap - EXIT INT TERM
     echo "- repeat this script after physical unplug/replug with --phase replug"
 } >>"$SUMMARY"
 
-echo "Evidence captured in $OUTPUT_ROOT"
+echo "Raw capture stored in $OUTPUT_ROOT"
