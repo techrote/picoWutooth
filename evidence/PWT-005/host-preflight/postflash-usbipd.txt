@@ -1,8 +1,0 @@
-Connected:
-BUSID  VID:PID    DEVICE                                                        STATE
-2-1    046d:c537  USB Input Device                                              Not shared
-2-2    3434:0181  USB Input Device                                              Not shared
-3-14   346d:5678  USB Mass Storage Device                                       Not shared
-
-Persisted:
-GUID                                  DEVICE
