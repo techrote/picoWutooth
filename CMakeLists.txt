@@ -59,6 +59,14 @@ target_link_libraries(picowutooth
         tinyusb_board
 )
 
+# Pico SDK 2.3.1's TinyUSB aggregate omits the BTH class source even though
+# usbd.c registers it when CFG_TUD_BTH=1. Compile the exact pinned upstream
+# source directly; tools/fetch-pico-sdk.* applies our zero-ISO compatibility
+# patch to this same file before configuration.
+target_sources(picowutooth PRIVATE
+    "${PICO_TINYUSB_PATH}/src/class/bth/bth_device.c"
+)
+
 target_compile_definitions(picowutooth
     PRIVATE
         PWT_SOURCE_COMMIT="${PWT_SOURCE_COMMIT}"
