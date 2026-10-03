@@ -30,6 +30,7 @@ add_executable(pwt_usb_hci_tests
 target_include_directories(pwt_usb_hci_tests
     PRIVATE
         ${CMAKE_SOURCE_DIR}/firmware
+        ${CMAKE_SOURCE_DIR}/include
 )
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
@@ -37,3 +38,22 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 add_test(NAME pwt003_usb_hci COMMAND pwt_usb_hci_tests)
+
+add_executable(pwt_bridge_tests
+    pwt004_bridge_test.c
+    ${CMAKE_SOURCE_DIR}/firmware/controller_bridge.c
+    ${CMAKE_SOURCE_DIR}/firmware/usb_hci_router.c
+    ${CMAKE_SOURCE_DIR}/src/hci_transport.c
+)
+
+target_include_directories(pwt_bridge_tests
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/firmware
+        ${CMAKE_SOURCE_DIR}/include
+)
+
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(pwt_bridge_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+add_test(NAME pwt004_bridge COMMAND pwt_bridge_tests)
