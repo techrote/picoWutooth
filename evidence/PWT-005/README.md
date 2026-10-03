@@ -27,6 +27,8 @@ performed, plus standard tools:
 
 - `usbutils` / `lsusb`;
 - BlueZ `btmgmt`, `btmon`, and `bluetoothctl`;
+- BlueZ `hciconfig` and `hcitool` (often in a separate deprecated-tools package),
+  for explicit HCI reset/info and a controlled HCI LE connection;
 - `journalctl` where available;
 - `sha256sum`.
 
@@ -84,3 +86,25 @@ show, on an exact candidate:
   host version.
 
 Until those records exist, PWT-005 remains **not accepted**.
+
+## Windows-host attempt: incompatible board
+
+See `host-preflight/FAILURE.md` and the retained partial Linux capture. The
+connected device described itself as "Pico W" on COM10, but the user identified
+it as an **ESP8266-equipped clone without CYW43** after flashing. It cannot
+satisfy this campaign. USB descriptors alone do not prove compatible hardware.
+
+A QEMU TCG Alpine Linux host was prepared because WSL was absent and hardware
+virtualization disabled. Standard `btusb`/USBIP modules and BlueZ tooling are
+available; actual candidate USB passthrough/controller operation remain unproven.
+No controller, BLE or accepted replug PASS is claimed.
+
+The attempt also found deterministic software defects: the capture helper
+exited the whole harness after its first command, and the USB adapter tried to
+arm ACL OUT before configuration. Regression tests reproduce both; fixes must
+pass exact-head CI. The unsupported `btmgmt connect` call was also replaced by
+standard BlueZ `hcitool lecc`, selecting the supplied public/random peer address
+type explicitly. No connection success is inferred from a tool exit alone;
+verify a successful LE Connection Complete and Disconnection Complete in btmon.
+Flash the new exact-head artifact to a genuine Pico W/WH
+and repeat the complete campaign before marking this PR ready or merging.

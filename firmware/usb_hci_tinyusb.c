@@ -18,7 +18,8 @@ static bool tinyusb_send_acl(void *context, const uint8_t *data, uint16_t length
 }
 
 static void arm_acl_if_ready(void) {
-    if (active_router != NULL && pwt_usb_hci_can_receive_acl(active_router)) {
+    /* Before SET_CONFIGURATION (and after bus reset), BTH has no endpoint. */
+    if (tud_mounted() && active_router != NULL && pwt_usb_hci_can_receive_acl(active_router)) {
         /*
          * PWT-004's revision-locked TinyUSB patch makes ACL OUT re-arming
          * explicit. If the endpoint is already armed this is a harmless no-op.

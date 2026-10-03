@@ -1,0 +1,29 @@
+KeyName : DEVPKEY_Device_HardwareIds
+Data    : {USB\VID_239A&PID_CAFE&REV_0100, USB\VID_239A&PID_CAFE}
+
+KeyName : DEVPKEY_Device_Service
+Data    : usbccgp
+
+KeyName : DEVPKEY_Device_Manufacturer
+Data    : (Standard USB Host Controller)
+
+KeyName : DEVPKEY_Device_LocationInfo
+Data    : Port_#0005.Hub_#0003
+
+KeyName : DEVPKEY_Device_BaseContainerId
+Data    : {36BEBE48-E24C-59B6-91EB-2BE35F50607A}
+
+KeyName : DEVPKEY_Device_Parent
+Data    : USB\ROOT_HUB30\5&e8a0ca7&0&0
+
+KeyName : DEVPKEY_Device_ContainerId
+Data    : {36BEBE48-E24C-59B6-91EB-2BE35F50607A}
+
+KeyName : DEVPKEY_Device_BusReportedDeviceDesc
+Data    : Pico W
+
+KeyName : DEVPKEY_Device_PhysicalDeviceLocation
+Data    : {2, 0, 0, 0…}
+
+KeyName : DEVPKEY_Device_LocationPaths
+Data    : {PCIROOT(0)#PCI(0103)#PCI(0000)#USBROOT(0)#USB(5), ACPI(_SB_)#ACPI(PCI0)#ACPI(GPP2)#ACPI(PTXH)#ACPI(RHUB)#ACPI(POT5)}

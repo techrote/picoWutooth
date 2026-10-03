@@ -57,3 +57,19 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 add_test(NAME pwt004_bridge COMMAND pwt_bridge_tests)
+
+add_executable(pwt_tinyusb_lifecycle_tests
+    pwt005_tinyusb_lifecycle_test.c
+    ${CMAKE_SOURCE_DIR}/firmware/controller_stub.c
+    ${CMAKE_SOURCE_DIR}/firmware/usb_hci_router.c
+    ${CMAKE_SOURCE_DIR}/firmware/usb_hci_tinyusb.c
+)
+target_include_directories(pwt_tinyusb_lifecycle_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/fakes
+    ${CMAKE_SOURCE_DIR}/firmware
+    ${CMAKE_SOURCE_DIR}/include
+)
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(pwt_tinyusb_lifecycle_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+add_test(NAME pwt005_tinyusb_lifecycle COMMAND pwt_tinyusb_lifecycle_tests)

@@ -57,7 +57,8 @@ if [[ ! "$SCAN_SECONDS" =~ ^[0-9]+$ ]] || [[ "$SCAN_SECONDS" -lt 1 ]]; then
 fi
 
 case "$DEVICE_TYPE" in
-    public|random|le_public|le_random) ;;
+    public|le_public) DEVICE_TYPE=le_public ;;
+    random|le_random) DEVICE_TYPE=le_random ;;
     *) echo "error: invalid --device-type: $DEVICE_TYPE" >&2; exit 2 ;;
 esac
 
@@ -74,7 +75,7 @@ record() {
     printf '%s=%s\n' "$1" "$2" | tee -a "$SUMMARY"
 }
 
-capture() {
+capture() (
     local name="$1"
     shift
     {
@@ -86,12 +87,21 @@ capture() {
         printf '\nexit_status=%d\n' "$status"
         exit "$status"
     } >"$OUTPUT_ROOT/$name" 2>&1
-}
+)
 
 capture_optional() {
     local name="$1"
     shift
     capture "$name" "$@" || true
+}
+
+capture_kernel() {
+    local name="$1"
+    if command_exists journalctl; then
+        capture_optional "$name" journalctl -k --since "-10 min" --no-pager
+    else
+        capture_optional "$name" dmesg
+    fi
 }
 
 command_exists() {
@@ -127,7 +137,7 @@ else
     record uf2_sha256 "not-supplied"
 fi
 
-for cmd in lsusb btmgmt btmon bluetoothctl timeout; do
+for cmd in lsusb btmgmt btmon bluetoothctl hciconfig hcitool timeout; do
     if command_exists "$cmd"; then
         record "tool_$cmd" "$(command -v "$cmd")"
         capture_optional "version-$cmd.txt" "$cmd" --version
@@ -142,7 +152,7 @@ if command_exists lsusb; then
     capture_optional "usb-tree.txt" lsusb -t
 fi
 
-capture_optional "bluetoothctl-list.txt" bluetoothctl list
+capture_optional "bluetoothctl-list.txt" timeout 10 bluetoothctl list
 
 find_usb_ancestor() {
     local path
@@ -188,7 +198,7 @@ fi
 if [[ -z "$HCI" || ! -d "/sys/class/bluetooth/$HCI" ]]; then
     record hci_device "NOT_FOUND"
     record driver_binding "NOT_FOUND"
-    capture_optional "kernel-log.txt" journalctl -k --since "-10 min" --no-pager
+    capture_kernel "kernel-log.txt"
     echo "No Bluetooth HCI device for USB ${VID}:${PID} was found." >&2
     echo "Evidence retained in $OUTPUT_ROOT" >&2
     exit 3
@@ -223,7 +233,7 @@ fi
 capture_optional "sysfs-device.txt" sh -c "readlink -f '/sys/class/bluetooth/$HCI/device'; find '/sys/class/bluetooth/$HCI' -maxdepth 1 -type f -print -exec cat {} \;"
 capture_optional "btmgmt-info-before.txt" btmgmt --index "$INDEX" info
 capture_optional "btmgmt-extinfo-before.txt" btmgmt --index "$INDEX" extinfo
-capture_optional "kernel-log-before.txt" journalctl -k --since "-10 min" --no-pager
+capture_kernel "kernel-log-before.txt"
 
 BTMON_PID=""
 if command_exists btmon; then
@@ -246,8 +256,19 @@ capture_optional "btmgmt-power-off.txt" btmgmt --index "$INDEX" power off
 sleep 1
 capture_optional "btmgmt-power-on.txt" btmgmt --index "$INDEX" power on
 sleep 2
+capture_optional "hci-reset.txt" timeout 15 hciconfig "$HCI" reset
 capture_optional "btmgmt-info-after-power-cycle.txt" btmgmt --index "$INDEX" info
 capture_optional "btmgmt-extinfo-after-power-cycle.txt" btmgmt --index "$INDEX" extinfo
+
+# Registration may have queried these before btmon started. Explicit reads
+# retain version, supported commands/features, buffers and BD_ADDR in the trace.
+for query in 'local-version 0x04 0x0001' 'supported-commands 0x04 0x0002' \
+             'local-features 0x04 0x0003' 'buffer-size 0x04 0x0005' \
+             'bd-addr 0x04 0x0009' 'le-buffer-size 0x08 0x0002' \
+             'le-features 0x08 0x0003'; do
+    read -r name ogf ocf <<< "$query"
+    capture_optional "hci-$name.txt" timeout 10 hcitool -i "$HCI" cmd "$ogf" "$ocf"
+done
 
 if command_exists btmgmt; then
     capture_optional "ble-scan.txt" timeout "$((SCAN_SECONDS + 5))"         btmgmt --index "$INDEX" --timeout "$SCAN_SECONDS" find -l
@@ -257,7 +278,8 @@ fi
 if [[ -n "$DEVICE" ]]; then
     record controlled_device "$DEVICE"
     record controlled_device_type "$DEVICE_TYPE"
-    capture_optional "controlled-connect.txt" timeout 25         btmgmt --index "$INDEX" --timeout 20 connect -t "$DEVICE_TYPE" "$DEVICE"
+    capture_optional "controlled-connect.txt" bash \
+        "$(dirname "${BASH_SOURCE[0]}")/pwt005-le-connect.sh" "$HCI" "$DEVICE" "$DEVICE_TYPE"
     capture_optional "controlled-connection-info.txt"         btmgmt --index "$INDEX" conn-info -t "$DEVICE_TYPE" "$DEVICE"
     capture_optional "controlled-connections.txt" btmgmt --index "$INDEX" con
     capture_optional "controlled-disconnect.txt"         btmgmt --index "$INDEX" disconnect -t "$DEVICE_TYPE" "$DEVICE"
@@ -265,11 +287,11 @@ else
     record controlled_device "not-supplied"
 fi
 
-capture_optional "bluetoothctl-list-after.txt" bluetoothctl list
+capture_optional "bluetoothctl-list-after.txt" timeout 10 bluetoothctl list
 if [[ -n "$CONTROLLER_ADDRESS" ]]; then
-    capture_optional "bluetoothctl-show.txt" bluetoothctl show "$CONTROLLER_ADDRESS"
+    capture_optional "bluetoothctl-show.txt" timeout 10 bluetoothctl show "$CONTROLLER_ADDRESS"
 fi
-capture_optional "kernel-log-after.txt" journalctl -k --since "-10 min" --no-pager
+capture_kernel "kernel-log-after.txt"
 
 cleanup
 BTMON_PID=""
