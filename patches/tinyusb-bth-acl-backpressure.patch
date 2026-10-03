@@ -1,0 +1,58 @@
+diff --git a/src/class/bth/bth_device.h b/src/class/bth/bth_device.h
+--- a/src/class/bth/bth_device.h
++++ b/src/class/bth/bth_device.h
+@@ -82,6 +82,13 @@ bool tud_bt_event_send(void *event, uint16_t event_len);
+ // and must not be reused till tud_bt_acl_data_sent_cb() is called.
+ bool tud_bt_acl_data_send(void *acl_data, uint16_t data_len);
+ 
++// Arm the ACL OUT endpoint for one more host-to-controller USB transfer.
++// picoWutooth uses this explicit re-arm point to apply bounded bridge
++// backpressure. Calling it while a receive transfer is already armed is safe
++// and leaves the existing transfer in place.
++bool tud_bt_acl_data_receive_ready(void);
++
+ //--------------------------------------------------------------------+
+ // Internal Class Driver API
+ //--------------------------------------------------------------------+
+diff --git a/src/class/bth/bth_device.c b/src/class/bth/bth_device.c
+--- a/src/class/bth/bth_device.c
++++ b/src/class/bth/bth_device.c
+@@ -84,6 +84,17 @@ bool tud_bt_acl_data_send(void *event, uint16_t event_len)
+   return bt_tx_data(_btd_itf.ep_acl_in, event, event_len);
+ }
+ 
++bool tud_bt_acl_data_receive_ready(void)
++{
++  uint8_t const rhport = 0;
++  if (_btd_itf.ep_acl_out == 0) return false;
++
++  // A transfer may already have been armed by the application/service loop.
++  if (usbd_edpt_busy(rhport, _btd_itf.ep_acl_out)) return true;
++
++  return usbd_edpt_xfer(rhport, _btd_itf.ep_acl_out, _btd_epbuf.epout_buf, CFG_TUD_BTH_DATA_EPSIZE);
++}
++
+ //--------------------------------------------------------------------+
+ // USBD Driver API
+ //--------------------------------------------------------------------+
+@@ -151,7 +162,7 @@ uint16_t btd_open(uint8_t rhport, tusb_desc_interface_t const *itf_desc, uint16
+   }
+ 
+   // Prepare for incoming data from host
+-  TU_ASSERT(usbd_edpt_xfer(rhport, _btd_itf.ep_acl_out, _btd_epbuf.epout_buf, CFG_TUD_BTH_DATA_EPSIZE), 0);
++  TU_ASSERT(tud_bt_acl_data_receive_ready(), 0);
+ 
+   drv_len = hci_itf_size;
+ 
+@@ -284,9 +295,8 @@ bool btd_xfer_cb(uint8_t rhport, uint8_t ep_addr, xfer_result_t result,
+   if (ep_addr == _btd_itf.ep_acl_out)
+   {
+     if (tud_bt_acl_data_received_cb) tud_bt_acl_data_received_cb(_btd_epbuf.epout_buf, xferred_bytes);
+-
+-    // prepare for next data
+-    TU_ASSERT(usbd_edpt_xfer(rhport, _btd_itf.ep_acl_out, _btd_epbuf.epout_buf, CFG_TUD_BTH_DATA_EPSIZE));
++    // The application explicitly re-arms ACL OUT after it has safely consumed
++    // this fragment. Leaving it unarmed makes the host observe USB NAKs.
+   }
+   else if (ep_addr == _btd_itf.ep_ev)
+   {
