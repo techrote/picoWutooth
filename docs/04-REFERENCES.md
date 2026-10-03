@@ -2,6 +2,23 @@
 
 Use primary upstream documentation/source wherever possible. Re-check live upstream state when an issue depends on an API detail, then pin the dependency revision used by picoWutooth.
 
+## Pinned foundation baseline
+
+PWT-001 pins the dependency set used by the project foundation:
+
+| Dependency | Pinned revision |
+|---|---|
+| Raspberry Pi Pico SDK | release `2.3.1`, commit `079c6f39023649b154152db30f1d781e884879bc` |
+| TinyUSB (SDK submodule) | `86ad6e56c1700e85f1c5678607a762cfe3aa2f47` |
+| CYW43 driver (SDK submodule) | `055d64274b014dd7b1c2fc94d26e8a18face7124` |
+| BTstack (SDK submodule) | `eb0bb8b5ea6d234ccb940313b47f7a5c3b4e20ec` |
+| GitHub `actions/checkout` | `3d3c42e5aac5ba805825da76410c181273ba90b1` (v7.0.1) |
+| GitHub `actions/upload-artifact` | `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` (v7.0.1) |
+
+The SDK release was selected as the current stable Raspberry Pi release at foundation time (published 2026-09-04). The repository helper scripts verify the SDK and the three Bluetooth-relevant submodule SHAs after checkout instead of trusting a floating tag or branch.
+
+CI uses `ubuntu-24.04`, CMake/Ninja, and Ubuntu's `gcc-arm-none-eabi`, `libnewlib-arm-none-eabi`, and `libstdc++-arm-none-eabi-newlib` packages. Exact compiler and CMake version strings are recorded in each firmware build manifest. The source tree does not vendor or maintain an independent TinyUSB checkout.
+
 ## Raspberry Pi / Pico SDK
 
 - Pico SDK networking/Bluetooth libraries:  

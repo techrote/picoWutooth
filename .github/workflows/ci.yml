@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native-tests:
+    name: Native tests
+    runs-on: ubuntu-24.04
+    env:
+      PWT_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.PWT_SOURCE_SHA }}
+          persist-credentials: false
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build
+
+      - name: Configure native tests
+        run: cmake -S . -B build-native -G Ninja -DPWT_BUILD_NATIVE_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build native tests
+        run: cmake --build build-native --parallel 2
+
+      - name: Run native tests
+        run: ctest --test-dir build-native --output-on-failure
+
+  firmware:
+    name: Pico W firmware
+    runs-on: ubuntu-24.04
+    env:
+      PWT_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PICO_SDK_PATH: ${{ github.workspace }}/.deps/pico-sdk
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.PWT_SOURCE_SHA }}
+          persist-credentials: false
+
+      - name: Install ARM build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            ninja-build \
+            gcc-arm-none-eabi \
+            libnewlib-arm-none-eabi \
+            libstdc++-arm-none-eabi-newlib
+
+      - name: Fetch pinned Pico SDK and submodules
+        run: bash tools/fetch-pico-sdk.sh
+
+      - name: Configure firmware
+        run: |
+          cmake -S . -B build-firmware -G Ninja \
+            -DPICO_SDK_PATH="$PICO_SDK_PATH" \
+            -DPICO_BOARD=pico_w \
+            -DPWT_SOURCE_COMMIT="$PWT_SOURCE_SHA" \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build firmware
+        run: cmake --build build-firmware --target picowutooth --parallel 2
+
+      - name: Write build manifest
+        run: bash tools/write-build-manifest.sh build-firmware/picowutooth.uf2 build-firmware/build-manifest.txt
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: picowutooth-firmware-${{ env.PWT_SOURCE_SHA }}
+          if-no-files-found: error
+          path: |
+            build-firmware/picowutooth.uf2
+            build-firmware/build-manifest.txt
