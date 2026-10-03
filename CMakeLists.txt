@@ -71,8 +71,8 @@ target_link_libraries(picowutooth
 
 # Pico SDK 2.3.1's TinyUSB aggregate omits the BTH class source even though
 # usbd.c registers it when CFG_TUD_BTH=1. Compile the exact pinned upstream
-# source directly; tools/fetch-pico-sdk.* applies our zero-ISO compatibility
-# patch to this same file before configuration.
+# source directly; tools/fetch-pico-sdk.* applies the revision-locked zero-ISO
+# and ACL-OUT backpressure patches to this same source before configuration.
 target_sources(picowutooth PRIVATE
     "${PICO_TINYUSB_PATH}/src/class/bth/bth_device.c"
 )
@@ -101,8 +101,8 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     )
 endif()
 
-# PWT-002 and PWT-003 remain independent controller and USB halves here.
-# PWT-004 owns the bridge between them; neither half silently absorbs the other.
+# PWT-004 joins the independently tested PWT-002 controller transport and
+# PWT-003 USB surface through firmware/controller_bridge.c.
 pico_enable_stdio_usb(picowutooth 0)
 pico_enable_stdio_uart(picowutooth 0)
 
