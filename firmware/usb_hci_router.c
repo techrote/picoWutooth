@@ -221,15 +221,16 @@ static void retry_pending_host(pwt_usb_hci_router_t *router) {
     }
 }
 
-static void release_pending(pwt_usb_hci_router_t *router) {
-    if (!router->pending_valid) {
-        return;
-    }
-
-    router->backend.release_to_host(router->backend.context, router->pending.token);
-    memset(&router->pending, 0, sizeof(router->pending));
-    router->pending_valid = false;
-    router->pending_submitted = false;
+static void clear_pending_to_usb(pwt_usb_hci_router_t *router) {
+    router->pending_to_usb_kind = 0;
+    router->pending_to_usb_length = 0u;
+    router->pending_to_usb_valid = false;
+    router->pending_to_usb_submitted = false;
+    /*
+     * Do not memset pending_to_usb here. TinyUSB may still own the static buffer
+     * during exceptional disconnect/reset sequencing; leaving bytes untouched
+     * prevents use-after-recycle even after logical ownership is cleared.
+     */
 }
 
 void pwt_usb_hci_service(pwt_usb_hci_router_t *router) {
@@ -238,17 +239,18 @@ void pwt_usb_hci_service(pwt_usb_hci_router_t *router) {
     }
 
     retry_pending_host(router);
-    if (router->recovery_required || router->pending_submitted) {
+    if (router->recovery_required || router->pending_to_usb_submitted) {
         return;
     }
 
-    if (!router->pending_valid) {
+    if (!router->pending_to_usb_valid) {
         pwt_hci_packet_view_t packet = {0};
         if (!router->backend.peek_to_host(router->backend.context, &packet)) {
             return;
         }
 
-        if (packet.data == NULL || packet.length == 0u || packet.token == NULL ||
+        if (packet.data == NULL || packet.length == 0u ||
+            packet.length > PWT_HCI_MAX_PAYLOAD || packet.token == NULL ||
             (packet.kind != PWT_HCI_PACKET_EVENT && packet.kind != PWT_HCI_PACKET_ACL)) {
             router->stats.malformed_controller_packets++;
             router->recovery_required = true;
@@ -258,21 +260,34 @@ void pwt_usb_hci_service(pwt_usb_hci_router_t *router) {
             return;
         }
 
-        router->pending = packet;
-        router->pending_valid = true;
+        memcpy(router->pending_to_usb, packet.data, packet.length);
+        router->pending_to_usb_kind = packet.kind;
+        router->pending_to_usb_length = packet.length;
+        router->pending_to_usb_valid = true;
+        router->stats.controller_packets_copied++;
+
+        /*
+         * The controller queue slot can now be reused: USB owns only the
+         * router's static copy until its completion callback.
+         */
+        router->backend.release_to_host(router->backend.context, packet.token);
     }
 
     bool submitted = false;
-    if (router->pending.kind == PWT_HCI_PACKET_EVENT) {
+    if (router->pending_to_usb_kind == PWT_HCI_PACKET_EVENT) {
         submitted = router->usb_tx.send_event(
-            router->usb_tx.context, router->pending.data, router->pending.length);
+            router->usb_tx.context,
+            router->pending_to_usb,
+            router->pending_to_usb_length);
     } else {
         submitted = router->usb_tx.send_acl(
-            router->usb_tx.context, router->pending.data, router->pending.length);
+            router->usb_tx.context,
+            router->pending_to_usb,
+            router->pending_to_usb_length);
     }
 
     if (submitted) {
-        router->pending_submitted = true;
+        router->pending_to_usb_submitted = true;
     } else {
         router->stats.usb_busy_retries++;
     }
@@ -282,8 +297,9 @@ static void transfer_complete(
     pwt_usb_hci_router_t *router,
     pwt_hci_packet_kind_t kind,
     uint16_t sent_bytes) {
-    if (router == NULL || !router->pending_valid || !router->pending_submitted ||
-        router->pending.kind != kind) {
+    if (router == NULL || !router->pending_to_usb_valid ||
+        !router->pending_to_usb_submitted ||
+        router->pending_to_usb_kind != kind) {
         if (router != NULL) {
             router->stats.completion_mismatch++;
             router->recovery_required = true;
@@ -291,13 +307,13 @@ static void transfer_complete(
         return;
     }
 
-    if (sent_bytes != router->pending.length) {
+    if (sent_bytes != router->pending_to_usb_length) {
         router->stats.completion_mismatch++;
         router->recovery_required = true;
     }
 
     router->stats.controller_packets_sent++;
-    release_pending(router);
+    clear_pending_to_usb(router);
 }
 
 void pwt_usb_hci_event_sent(pwt_usb_hci_router_t *router, uint16_t sent_bytes) {
@@ -313,12 +329,13 @@ void pwt_usb_hci_reset(pwt_usb_hci_router_t *router) {
         return;
     }
 
-    release_pending(router);
-
     if (router->pending_command_valid) {
         router->stats.packets_discarded_on_reset++;
     }
     if (router->acl_assembly_length != 0u) {
+        router->stats.packets_discarded_on_reset++;
+    }
+    if (router->pending_to_usb_valid) {
         router->stats.packets_discarded_on_reset++;
     }
 
@@ -326,6 +343,7 @@ void pwt_usb_hci_reset(pwt_usb_hci_router_t *router) {
     router->pending_command_length = 0u;
     router->pending_command_valid = false;
     clear_acl_assembly(router);
+    clear_pending_to_usb(router);
 
     if (router->backend.reset != NULL) {
         router->backend.reset(router->backend.context);
