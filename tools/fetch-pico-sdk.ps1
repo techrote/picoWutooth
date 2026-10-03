@@ -12,7 +12,8 @@ $SdkDir = if ($env:PICO_SDK_PATH) {
 } else {
     Join-Path $RootDir ".deps\pico-sdk"
 }
-$TinyUsbPatch = Join-Path $RootDir "patches\tinyusb-bth-no-iso.patch"
+$TinyUsbNoIsoPatch = Join-Path $RootDir "patches\tinyusb-bth-no-iso.patch"
+$TinyUsbAclBackpressurePatch = Join-Path $RootDir "patches\tinyusb-bth-acl-backpressure.patch"
 
 $Parent = Split-Path -Parent $SdkDir
 New-Item -ItemType Directory -Force -Path $Parent | Out-Null
@@ -47,26 +48,32 @@ function Assert-Commit([string]$Path, [string]$Expected) {
     }
 }
 
+function Apply-PatchIdempotent([string]$Repository, [string]$Patch, [string]$Label) {
+    git -C $Repository apply --check $Patch 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        git -C $Repository apply $Patch
+        if ($LASTEXITCODE -ne 0) { throw "$Label apply failed" }
+        return
+    }
+
+    git -C $Repository apply --reverse --check $Patch 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Repository does not accept $Label cleanly"
+    }
+    Write-Host "$Label already applied"
+}
+
 Assert-Commit $SdkDir $SdkCommit
 $TinyUsbDir = Join-Path $SdkDir "lib\tinyusb"
 Assert-Commit $TinyUsbDir $TinyUsbCommit
 Assert-Commit (Join-Path $SdkDir "lib\cyw43-driver") $Cyw43Commit
 Assert-Commit (Join-Path $SdkDir "lib\btstack") $BtstackCommit
 
-git -C $TinyUsbDir apply --check $TinyUsbPatch 2>$null
-if ($LASTEXITCODE -eq 0) {
-    git -C $TinyUsbDir apply $TinyUsbPatch
-    if ($LASTEXITCODE -ne 0) { throw "TinyUSB patch apply failed" }
-} else {
-    git -C $TinyUsbDir apply --reverse --check $TinyUsbPatch 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        throw "TinyUSB worktree does not accept the pinned picoWutooth patch cleanly"
-    }
-    Write-Host "TinyUSB no-ISO patch already applied"
-}
+Apply-PatchIdempotent $TinyUsbDir $TinyUsbNoIsoPatch "TinyUSB no-ISO patch"
+Apply-PatchIdempotent $TinyUsbDir $TinyUsbAclBackpressurePatch "TinyUSB ACL backpressure patch"
 
 Write-Host "Pico SDK ready: $SdkDir"
 Write-Host "  pico-sdk:     $SdkCommit"
-Write-Host "  tinyusb:      $TinyUsbCommit + picoWutooth no-ISO patch"
+Write-Host "  tinyusb:      $TinyUsbCommit + picoWutooth no-ISO/backpressure patches"
 Write-Host "  cyw43-driver: $Cyw43Commit"
 Write-Host "  btstack:      $BtstackCommit"
