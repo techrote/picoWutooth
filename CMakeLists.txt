@@ -54,7 +54,13 @@ target_compile_definitions(picowutooth
 )
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(picowutooth PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    # Pico SDK sources are compiled as part of the final target, so target-wide
+    # warning flags would also police third-party code. Keep the strict gate on
+    # picoWutooth-owned sources only.
+    set_source_files_properties(
+        firmware/main.c
+        PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Wpedantic;-Werror"
+    )
 endif()
 
 # The MVP production firmware must not accidentally grow a CDC/USB stdio
