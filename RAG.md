@@ -47,14 +47,16 @@ Deferred until after the MVP: Wi-Fi coexistence, composite USB debug interfaces,
 
 ## Programme work IDs
 
-- **PWT-001** — reproducible firmware/build/CI foundation
-- **PWT-002** — CYW43 raw-HCI adapter and initialization contract
-- **PWT-003** — TinyUSB Bluetooth-HCI USB surface with deterministic stub controller
-- **PWT-004** — production HCI bridge, buffering and flow control
-- **PWT-005** — Linux protocol/hardware acceptance
-- **PWT-006** — Windows 11 generic Bluetooth adapter acceptance
-- **PWT-007** — BR/EDR interoperability and disconnect/reset robustness
-- **PWT-008** — v0.1 release hardening and reproducible UF2
-- **PWT-009** — post-MVP SCO/ISO audio feasibility (non-blocking)
+- **PWT-001 / #2** — reproducible firmware/build/CI foundation
+- **PWT-002 / #3** — CYW43 raw-HCI adapter and initialization contract
+- **PWT-003 / #4** — TinyUSB Bluetooth-HCI USB surface with deterministic stub/controller seam
+- **PWT-004 / #5** — production HCI bridge, buffering and flow control
+- **PWT-005 / #6** — Linux protocol/hardware acceptance
+- **PWT-006 / #7** — Windows 11 generic Bluetooth adapter acceptance
+- **PWT-007 / #8** — BR/EDR interoperability and disconnect/reset robustness
+- **PWT-008 / #9** — v0.1 release hardening and reproducible UF2
+- **PWT-009 / #10** — post-MVP SCO/ISO audio feasibility (non-blocking)
+
+Programme tracker: **#1**.
 
 See `docs/00-PROGRAMME.md` for dependencies and gates.
