@@ -111,6 +111,37 @@ PWT-003 additionally carries `patches/tinyusb-bth-no-iso.patch` against exact Ti
 The same pinned TinyUSB CMake aggregate does not include `src/class/bth/bth_device.c` in its device source list. With `CFG_TUD_BTH=1`, `usbd.c` registers the BTH driver but would otherwise leave its symbols unresolved. picoWutooth therefore adds that exact pinned upstream source to the firmware target explicitly; it is not vendored or reimplemented. Removal condition for both integration workarounds: adopt an upstream/Pico SDK combination that includes the BTH source and natively supports `CFG_TUD_BTH_ISO_ALT_COUNT=0`, then pass the same descriptor/routing and cross-build gates without the local accommodations.
 
 
+### PWT-004 TinyUSB ACL backpressure accommodation
+
+PWT-004 additionally carries
+`patches/tinyusb-bth-acl-backpressure.patch` against the same exact TinyUSB
+commit after the PWT-003 no-ISO patch is applied.
+
+At this pinned revision, `btd_xfer_cb()` unconditionally calls
+`usbd_edpt_xfer()` to re-arm the ACL OUT endpoint immediately after
+`tud_bt_acl_data_received_cb()`. That prevents a bounded application bridge
+from applying USB-level backpressure when all controller-facing buffers are
+occupied. The patch:
+
+- adds `tud_bt_acl_data_receive_ready()`;
+- uses it for the initial ACL OUT arm;
+- removes the unconditional post-callback re-arm;
+- lets picoWutooth explicitly re-arm only after it has copied or retained the
+  received fragment.
+
+Leaving the OUT endpoint unarmed uses ordinary USB NAK behavior; it does not
+drop the transfer. The router separately reassembles complete HCI ACL packets
+using the HCI ACL length field because the endpoint max packet is 64 bytes.
+
+Removal condition: adopt a pinned TinyUSB/Pico SDK revision that exposes
+equivalent application-controlled BTH ACL OUT flow control (or another upstream
+mechanism that proves the same no-drop property), then remove the patch only
+after the PWT-004 backpressure/reassembly tests and physical PWT-005 stress
+acceptance remain green.
+
+The build manifest records both the PWT-003 no-ISO patch SHA-256 and this
+PWT-004 ACL-backpressure patch SHA-256.
+
 A historical TinyUSB/Mynewt example demonstrates the intended model: enumerate the MCU as a Bluetooth controller and let a host OS scan/connect through its native stack:
 https://github.com/hathach/mynewt-tinyusb-example
 
