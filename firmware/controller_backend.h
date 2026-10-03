@@ -5,11 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef enum {
-    PWT_HCI_PACKET_COMMAND = 0x01,
-    PWT_HCI_PACKET_ACL = 0x02,
-    PWT_HCI_PACKET_EVENT = 0x04,
-} pwt_hci_packet_kind_t;
+#include "picowutooth/hci_transport.h"
 
 typedef enum {
     PWT_BACKEND_ACCEPTED = 0,
@@ -29,13 +25,19 @@ typedef struct {
 
     /*
      * TinyUSB owns host->controller callback buffers. Implementations must
-     * synchronously consume/copy data before returning.
+     * synchronously consume/copy data before returning ACCEPTED.
      */
     pwt_backend_submit_result_t (*submit_from_host)(
         void *context,
         pwt_hci_packet_kind_t kind,
         const uint8_t *data,
         uint16_t length);
+
+    /*
+     * Allows the USB ingress side to stop arming OUT transfers before the next
+     * packet would overflow bounded controller-facing storage.
+     */
+    bool (*can_accept_from_host)(void *context, pwt_hci_packet_kind_t kind);
 
     /*
      * Returns one controller->host packet whose backing storage remains owned

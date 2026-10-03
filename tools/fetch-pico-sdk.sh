@@ -9,7 +9,8 @@ BTSTACK_COMMIT="eb0bb8b5ea6d234ccb940313b47f7a5c3b4e20ec"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SDK_DIR="${PICO_SDK_PATH:-${ROOT_DIR}/.deps/pico-sdk}"
-TINYUSB_PATCH="${ROOT_DIR}/patches/tinyusb-bth-no-iso.patch"
+TINYUSB_NO_ISO_PATCH="${ROOT_DIR}/patches/tinyusb-bth-no-iso.patch"
+TINYUSB_ACL_BACKPRESSURE_PATCH="${ROOT_DIR}/patches/tinyusb-bth-acl-backpressure.patch"
 
 mkdir -p "$(dirname "${SDK_DIR}")"
 
@@ -39,22 +40,32 @@ verify_commit() {
     fi
 }
 
+apply_patch_idempotent() {
+    local repository="$1"
+    local patch="$2"
+    local label="$3"
+
+    if git -C "${repository}" apply --check "${patch}"; then
+        git -C "${repository}" apply "${patch}"
+    elif git -C "${repository}" apply --reverse --check "${patch}"; then
+        echo "${label} already applied"
+    else
+        echo "error: ${repository} does not accept ${label} cleanly" >&2
+        exit 1
+    fi
+}
+
 verify_commit "${SDK_DIR}" "${SDK_COMMIT}"
 verify_commit "${SDK_DIR}/lib/tinyusb" "${TINYUSB_COMMIT}"
 verify_commit "${SDK_DIR}/lib/cyw43-driver" "${CYW43_COMMIT}"
 verify_commit "${SDK_DIR}/lib/btstack" "${BTSTACK_COMMIT}"
 
-if git -C "${SDK_DIR}/lib/tinyusb" apply --check "${TINYUSB_PATCH}"; then
-    git -C "${SDK_DIR}/lib/tinyusb" apply "${TINYUSB_PATCH}"
-elif git -C "${SDK_DIR}/lib/tinyusb" apply --reverse --check "${TINYUSB_PATCH}"; then
-    echo "TinyUSB no-ISO patch already applied"
-else
-    echo "error: TinyUSB worktree does not accept the pinned picoWutooth patch cleanly" >&2
-    exit 1
-fi
+apply_patch_idempotent     "${SDK_DIR}/lib/tinyusb"     "${TINYUSB_NO_ISO_PATCH}"     "TinyUSB no-ISO patch"
+
+apply_patch_idempotent     "${SDK_DIR}/lib/tinyusb"     "${TINYUSB_ACL_BACKPRESSURE_PATCH}"     "TinyUSB ACL backpressure patch"
 
 echo "Pico SDK ready: ${SDK_DIR}"
 echo "  pico-sdk:     ${SDK_COMMIT}"
-echo "  tinyusb:      ${TINYUSB_COMMIT} + picoWutooth no-ISO patch"
+echo "  tinyusb:      ${TINYUSB_COMMIT} + picoWutooth no-ISO/backpressure patches"
 echo "  cyw43-driver: ${CYW43_COMMIT}"
 echo "  btstack:      ${BTSTACK_COMMIT}"

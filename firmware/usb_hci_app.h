@@ -3,7 +3,9 @@
 
 #include <stdbool.h>
 
-bool pwt_usb_hci_app_init(void);
+#include "picowutooth/hci_transport.h"
+
+bool pwt_usb_hci_app_init(pwt_hci_transport_t *transport);
 void pwt_usb_hci_app_task(void);
 
 #endif

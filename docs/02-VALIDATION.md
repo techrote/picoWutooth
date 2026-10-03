@@ -60,6 +60,35 @@ Parse the built descriptor representation or a generated fixture and assert:
 - no accidental CDC/vendor interface in production build;
 - ISO alternatives absent for MVP unless explicitly activated later.
 
+## PWT-004 deterministic bridge acceptance
+
+Before PWT-004 can become the physical PWT-005 candidate, native tests must
+exercise the integrated ownership contract, including:
+
+- all four MVP directions: command and ACL host→controller, event and ACL
+  controller→host;
+- HCI ACL reassembly across multiple 64-byte USB OUT fragments;
+- full command/ACL queues and retention of a completed packet until capacity
+  returns;
+- ring wraparound and preserved within-class order;
+- conservative command pacing released by Command Complete/Status;
+- conservative ACL pacing released by Number Of Completed Packets;
+- TinyUSB IN busy/retry without premature controller-buffer reuse;
+- reset while ingress, controller→host, or USB-egress state is occupied;
+- malformed/oversized host and controller packets becoming observable recovery
+  faults rather than silent drops;
+- transport-error reset and subsequent forward progress;
+- descriptor regression tests proving the production USB topology remains
+  single-purpose Bluetooth HCI with no ISO alternatives.
+
+The exact pinned TinyUSB worktree must accept both local BTH patches cleanly,
+and the Pico W cross-build must compile the patched upstream BTH class source.
+The CI build manifest records both patch SHA-256 values.
+
+These gates establish software ownership/backpressure behavior only. They do
+not establish that the CYW43439 actually emits the expected HCI flow-control
+events under load; PWT-005 must verify that on physical hardware.
+
 ## Build matrix
 
 At minimum:

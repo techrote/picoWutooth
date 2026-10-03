@@ -20,6 +20,12 @@ static pwt_backend_submit_result_t stub_submit_from_host(
     return PWT_BACKEND_ACCEPTED;
 }
 
+static bool stub_can_accept_from_host(void *context, pwt_hci_packet_kind_t kind) {
+    const pwt_controller_stub_t *stub = context;
+    return stub != NULL &&
+           (kind == PWT_HCI_PACKET_COMMAND || kind == PWT_HCI_PACKET_ACL);
+}
+
 static bool stub_peek_to_host(void *context, pwt_hci_packet_view_t *packet) {
     pwt_controller_stub_t *stub = context;
     if (stub == NULL || packet == NULL || !stub->to_host_queued) {
@@ -68,6 +74,7 @@ pwt_controller_backend_t pwt_controller_stub_backend(pwt_controller_stub_t *stub
     const pwt_controller_backend_t backend = {
         .context = stub,
         .submit_from_host = stub_submit_from_host,
+        .can_accept_from_host = stub_can_accept_from_host,
         .peek_to_host = stub_peek_to_host,
         .release_to_host = stub_release_to_host,
         .reset = stub_reset,

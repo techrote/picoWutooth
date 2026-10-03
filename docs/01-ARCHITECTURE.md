@@ -237,6 +237,95 @@ backpressure/retry policy; physical stress acceptance must revisit this boundary
 
 Prefer queues of complete HCI packets or length-delimited ring slots over arbitrary byte FIFOs that can lose framing after one corruption.
 
+## PWT-004 integrated bridge contract
+
+PWT-004 joins the PWT-002 controller transport and PWT-003 USB surface without
+moving CYW43 framing into USB code or TinyUSB ownership into the CYW43 adapter.
+
+### Bounded queues and ownership
+
+The production bridge uses complete HCI packets in statically bounded storage:
+
+| Queue/buffer | Capacity | Ownership purpose |
+|---|---:|---|
+| host command bridge queue | 2 packets | decouples EP0 command callbacks from CYW43 submission |
+| host ACL bridge queue | 4 packets | controller-bound ACL buffering |
+| controller→host bridge queue | 4 packets | drains CYW43 before USB IN availability |
+| router pending command | 1 packet | protects the void TinyUSB command callback when the bridge queue is temporarily full |
+| router ACL assembly | 1 packet | reassembles one HCI ACL packet across Full-Speed 64-byte USB OUT transfers |
+| router USB egress | 1 packet | stable storage retained until TinyUSB IN completion |
+
+The bridge and router share the PWT-002 typed HCI packet kind. CYW43's private
+four-byte transport prefix still exists only inside `hci_transport.c`.
+
+TinyUSB callback memory is synchronously copied before a callback returns.
+Controller→host data is copied from the bridge queue into the router-owned USB
+egress buffer before the bridge slot is released. A controller reset can
+therefore clear/reuse bridge storage without invalidating memory owned by an
+in-flight TinyUSB IN transfer.
+
+### Host→controller USB backpressure
+
+The pinned TinyUSB BTH driver arms ACL OUT using one
+`CFG_TUD_BTH_DATA_EPSIZE` buffer (64 bytes for the MVP). A complete HCI ACL
+packet is not therefore assumed to arrive in one callback. The router reads the
+HCI ACL length field and reassembles fragments until exactly one complete packet
+is present; overrun, impossible length, or malformed framing becomes a recovery
+fault rather than being interpreted as another packet.
+
+The upstream pinned BTH class automatically re-arms ACL OUT immediately after
+each callback, which gives the application no way to stop the host when all
+bounded storage is occupied. PWT-004 carries the revision-locked patch
+`patches/tinyusb-bth-acl-backpressure.patch`. It removes only that automatic
+re-arm and exposes `tud_bt_acl_data_receive_ready()`. picoWutooth re-arms the
+endpoint only when its ACL assembly/bridge path can retain the next transfer.
+When it cannot, leaving OUT unarmed causes normal USB NAK backpressure; no
+received fragment is discarded.
+
+HCI commands arrive over EP0 through a TinyUSB callback that cannot be
+retroactively NAKed. The router therefore owns one complete pending-command
+slot in addition to the two bridge command slots. HCI command-credit semantics
+normally prevent this path from filling. A further command that cannot be
+retained is treated as an observable transport fault and triggers recovery
+rather than silent loss.
+
+### Conservative CYW43 transmit pacing
+
+The PWT-002 public CYW43 boundary cannot report the shared-bus internal
+`CYBT_ERR_QUEUE_FULL` condition. PWT-004 therefore never relies on that
+unobservable result.
+
+Only one host→controller HCI packet is submitted to the public CYW43 write path
+at a time:
+
+- after a command, the bridge waits for a matching HCI Command Complete or
+  Command Status event that returns a non-zero command credit;
+- after an ACL packet, the bridge waits for Number Of Completed Packets for the
+  matching connection handle.
+
+Controller events are read before the next send decision, so the event that
+returns a credit can release the pacing gate in the same service iteration.
+This is intentionally conservative and preserves packet order within command
+and ACL classes. Performance tuning can relax it only after PWT-005 physical
+evidence establishes a safe controller-buffer contract.
+
+### Reset and recovery
+
+The CYW43439 transport must reach `READY` before TinyUSB is initialized, so a
+host cannot enumerate a controller whose bootstrap is incomplete.
+
+Normal host HCI Reset remains ordinary bridged HCI traffic. Transport recovery
+is different: malformed framing, an ownership mismatch, a CYW43 transport
+error, or an unrecoverable USB callback condition causes a visible USB
+disconnect, clears bounded queues according to their ownership rules, performs
+the PWT-002 full controller reset/rebootstrap, waits through a bounded disconnect
+interval, and reconnects USB only after the controller is ready again.
+
+Queued but not externally owned packets are discarded on reset and counted.
+No queue or buffer is silently overwritten. Recovery counters and discarded
+packet counts remain available internally without adding any production USB
+debug interface.
+
 ## Concurrency
 
 Start with the simplest scheduler compatible with the Pico SDK/CYW43 integration and TinyUSB device tasking. Do not introduce FreeRTOS or multicore merely for throughput before measurements prove the need.

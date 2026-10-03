@@ -195,16 +195,16 @@ static void test_controller_event_ownership_and_busy_retry(void) {
     pwt_usb_hci_service(&router);
     CHECK(usb.event_calls == 1u);
     CHECK(usb.acl_calls == 0u);
-    CHECK(stub.to_host_queued);
-    CHECK(stub.to_host_leased);
-    CHECK(stub.release_count == 0u);
+    CHECK(!stub.to_host_queued);
+    CHECK(!stub.to_host_leased);
+    CHECK(stub.release_count == 1u);
 
     usb.event_ready = true;
     pwt_usb_hci_service(&router);
     CHECK(usb.event_calls == 2u);
     CHECK(usb.event_length == sizeof(event));
     CHECK(memcmp(usb.event_data, event, sizeof(event)) == 0);
-    CHECK(stub.release_count == 0u);
+    CHECK(stub.release_count == 1u);
 
     pwt_usb_hci_event_sent(&router, sizeof(event));
     CHECK(stub.release_count == 1u);
@@ -227,7 +227,7 @@ static void test_controller_acl_routes_only_to_bulk_in(void) {
     CHECK(usb.event_calls == 0u);
     CHECK(usb.acl_calls == 1u);
     CHECK(memcmp(usb.acl_data, acl, sizeof(acl)) == 0);
-    CHECK(stub.release_count == 0u);
+    CHECK(stub.release_count == 1u);
 
     pwt_usb_hci_acl_sent(&router, sizeof(acl));
     CHECK(stub.release_count == 1u);
@@ -242,7 +242,8 @@ static void test_reset_releases_owned_packet(void) {
     const uint8_t event[] = {0x0f, 0x00};
     CHECK(pwt_controller_stub_queue_to_host(&stub, PWT_HCI_PACKET_EVENT, event, sizeof(event)));
     pwt_usb_hci_service(&router);
-    CHECK(stub.to_host_leased);
+    CHECK(!stub.to_host_leased);
+    CHECK(stub.release_count == 1u);
 
     pwt_usb_hci_reset(&router);
     CHECK(stub.release_count == 1u);

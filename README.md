@@ -16,7 +16,7 @@ Bluetooth devices
 
 ## Programme status
 
-The repository now contains the reproducible foundation plus the independently implemented PWT-002 CYW43-facing raw-HCI transport and PWT-003 TinyUSB Bluetooth-HCI USB surface. **They are not bridged yet:** PWT-004 owns that integration. The PWT-003 synthetic backend proves only USB-side descriptor/routing ownership, and no RF, Linux-host, or Windows-host acceptance is claimed by it.
+The repository now contains the reproducible foundation, the PWT-002 CYW43-facing raw-HCI transport, the PWT-003 TinyUSB Bluetooth-HCI USB surface, and the PWT-004 bounded production bridge joining them. The integrated firmware is a **software/CI candidate only** until PWT-005 performs physical Linux/controller/RF acceptance; no physical Bluetooth functionality is inferred from the cross-build or native tests.
 
 The MVP targets a single-purpose USB Bluetooth HCI device, with Linux used first for protocol-level diagnostics and Windows 11 as the primary generic-dongle acceptance target. BLE is the first functional milestone; BR/EDR follows. Wi-Fi coexistence, USB composite debug interfaces, and SCO/ISO audio are deliberately deferred until the basic controller path is stable.
 
@@ -71,7 +71,7 @@ cmake --build build-native
 ctest --test-dir build-native --output-on-failure
 ```
 
-Later programme issues extend this harness with packet-framing, descriptor, buffering, and state-machine tests.
+The native harness covers CYW43 framing/lifecycle, USB descriptor/routing contracts, and PWT-004 bridge buffering, ACL reassembly, backpressure, ownership, pacing, reset, and recovery state.
 
 ## CI artifacts and traceability
 
