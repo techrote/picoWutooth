@@ -17,7 +17,7 @@ PWT-001 pins the dependency set used by the project foundation:
 
 The SDK release was selected as the current stable Raspberry Pi release at foundation time (published 2026-09-04). The repository helper scripts verify the SDK and the three Bluetooth-relevant submodule SHAs after checkout instead of trusting a floating tag or branch.
 
-CI uses `ubuntu-24.04`, CMake/Ninja, and Ubuntu's `gcc-arm-none-eabi` + newlib packages. Exact compiler and CMake version strings are recorded in each firmware build manifest. The source tree does not vendor or maintain an independent TinyUSB checkout.
+CI uses `ubuntu-24.04`, CMake/Ninja, and Ubuntu's `gcc-arm-none-eabi`, `libnewlib-arm-none-eabi`, and `libstdc++-arm-none-eabi-newlib` packages. Exact compiler and CMake version strings are recorded in each firmware build manifest. The source tree does not vendor or maintain an independent TinyUSB checkout.
 
 ## Raspberry Pi / Pico SDK
 
