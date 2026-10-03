@@ -43,6 +43,12 @@ pico_sdk_init()
 
 add_executable(picowutooth
     firmware/main.c
+    firmware/usb_hci_app.c
+    firmware/controller_stub.c
+    firmware/usb_descriptor_data.c
+    firmware/usb_descriptors.c
+    firmware/usb_hci_router.c
+    firmware/usb_hci_tinyusb.c
     src/hci_transport.c
     src/cyw43_hci_backend.c
 )
@@ -50,6 +56,7 @@ add_executable(picowutooth
 target_include_directories(picowutooth
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/include
+        ${CMAKE_CURRENT_LIST_DIR}/firmware
 )
 
 target_link_libraries(picowutooth
@@ -58,6 +65,16 @@ target_link_libraries(picowutooth
         pico_cyw43_driver
         cyw43_driver_picow
         pico_async_context_threadsafe_background
+        tinyusb_device
+        tinyusb_board
+)
+
+# Pico SDK 2.3.1's TinyUSB aggregate omits the BTH class source even though
+# usbd.c registers it when CFG_TUD_BTH=1. Compile the exact pinned upstream
+# source directly; tools/fetch-pico-sdk.* applies our zero-ISO compatibility
+# patch to this same file before configuration.
+target_sources(picowutooth PRIVATE
+    "${PICO_TINYUSB_PATH}/src/class/bth/bth_device.c"
 )
 
 target_compile_definitions(picowutooth
@@ -72,14 +89,20 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     # INTERFACE libraries compile upstream sources into this target as well.
     set_source_files_properties(
         firmware/main.c
+        firmware/usb_hci_app.c
+        firmware/controller_stub.c
+        firmware/usb_descriptor_data.c
+        firmware/usb_descriptors.c
+        firmware/usb_hci_router.c
+        firmware/usb_hci_tinyusb.c
         src/hci_transport.c
         src/cyw43_hci_backend.c
         PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Wpedantic;-Werror"
     )
 endif()
 
-# PWT-003 owns the eventual single-purpose Bluetooth HCI USB class. PWT-002
-# initializes only the CYW43-facing controller transport and adds no USB surface.
+# PWT-002 and PWT-003 remain independent controller and USB halves here.
+# PWT-004 owns the bridge between them; neither half silently absorbs the other.
 pico_enable_stdio_usb(picowutooth 0)
 pico_enable_stdio_uart(picowutooth 0)
 

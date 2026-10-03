@@ -10,9 +10,14 @@ UF2="$1"
 OUT="$2"
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 SDK_DIR="${PICO_SDK_PATH:-${ROOT_DIR}/.deps/pico-sdk}"
+TINYUSB_PATCH="${ROOT_DIR}/patches/tinyusb-bth-no-iso.patch"
 
 if [[ ! -f "${UF2}" ]]; then
     echo "error: UF2 not found: ${UF2}" >&2
+    exit 1
+fi
+if [[ ! -f "${TINYUSB_PATCH}" ]]; then
+    echo "error: TinyUSB patch not found: ${TINYUSB_PATCH}" >&2
     exit 1
 fi
 
@@ -23,6 +28,7 @@ SDK_COMMIT="$(git -C "${SDK_DIR}" rev-parse HEAD)"
 TINYUSB_COMMIT="$(git -C "${SDK_DIR}/lib/tinyusb" rev-parse HEAD)"
 CYW43_COMMIT="$(git -C "${SDK_DIR}/lib/cyw43-driver" rev-parse HEAD)"
 BTSTACK_COMMIT="$(git -C "${SDK_DIR}/lib/btstack" rev-parse HEAD)"
+TINYUSB_PATCH_SHA256="$(sha256sum "${TINYUSB_PATCH}" | awk '{print $1}')"
 UF2_SHA256="$(sha256sum "${UF2}" | awk '{print $1}')"
 ARM_GCC="$(arm-none-eabi-gcc --version | head -n 1)"
 CMAKE_VERSION="$(cmake --version | head -n 1)"
@@ -33,6 +39,8 @@ source_commit=${SOURCE_COMMIT}
 pico_board=pico_w
 pico_sdk_commit=${SDK_COMMIT}
 tinyusb_commit=${TINYUSB_COMMIT}
+tinyusb_patch=patches/tinyusb-bth-no-iso.patch
+tinyusb_patch_sha256=${TINYUSB_PATCH_SHA256}
 cyw43_driver_commit=${CYW43_COMMIT}
 btstack_commit=${BTSTACK_COMMIT}
 arm_gcc=${ARM_GCC}

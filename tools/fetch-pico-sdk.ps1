@@ -12,6 +12,7 @@ $SdkDir = if ($env:PICO_SDK_PATH) {
 } else {
     Join-Path $RootDir ".deps\pico-sdk"
 }
+$TinyUsbPatch = Join-Path $RootDir "patches\tinyusb-bth-no-iso.patch"
 
 $Parent = Split-Path -Parent $SdkDir
 New-Item -ItemType Directory -Force -Path $Parent | Out-Null
@@ -47,12 +48,25 @@ function Assert-Commit([string]$Path, [string]$Expected) {
 }
 
 Assert-Commit $SdkDir $SdkCommit
-Assert-Commit (Join-Path $SdkDir "lib\tinyusb") $TinyUsbCommit
+$TinyUsbDir = Join-Path $SdkDir "lib\tinyusb"
+Assert-Commit $TinyUsbDir $TinyUsbCommit
 Assert-Commit (Join-Path $SdkDir "lib\cyw43-driver") $Cyw43Commit
 Assert-Commit (Join-Path $SdkDir "lib\btstack") $BtstackCommit
 
+git -C $TinyUsbDir apply --check $TinyUsbPatch 2>$null
+if ($LASTEXITCODE -eq 0) {
+    git -C $TinyUsbDir apply $TinyUsbPatch
+    if ($LASTEXITCODE -ne 0) { throw "TinyUSB patch apply failed" }
+} else {
+    git -C $TinyUsbDir apply --reverse --check $TinyUsbPatch 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "TinyUSB worktree does not accept the pinned picoWutooth patch cleanly"
+    }
+    Write-Host "TinyUSB no-ISO patch already applied"
+}
+
 Write-Host "Pico SDK ready: $SdkDir"
 Write-Host "  pico-sdk:     $SdkCommit"
-Write-Host "  tinyusb:      $TinyUsbCommit"
+Write-Host "  tinyusb:      $TinyUsbCommit + picoWutooth no-ISO patch"
 Write-Host "  cyw43-driver: $Cyw43Commit"
 Write-Host "  btstack:      $BtstackCommit"
