@@ -43,18 +43,28 @@ pico_sdk_init()
 
 add_executable(picowutooth
     firmware/main.c
+    firmware/usb_hci_app.c
     firmware/controller_stub.c
     firmware/usb_descriptor_data.c
     firmware/usb_descriptors.c
     firmware/usb_hci_router.c
     firmware/usb_hci_tinyusb.c
+    src/hci_transport.c
+    src/cyw43_hci_backend.c
 )
 
-target_include_directories(picowutooth PRIVATE firmware)
+target_include_directories(picowutooth
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/include
+        ${CMAKE_CURRENT_LIST_DIR}/firmware
+)
 
 target_link_libraries(picowutooth
     PRIVATE
         pico_stdlib
+        pico_cyw43_driver
+        cyw43_driver_picow
+        pico_async_context_threadsafe_background
         tinyusb_device
         tinyusb_board
 )
@@ -70,20 +80,29 @@ target_sources(picowutooth PRIVATE
 target_compile_definitions(picowutooth
     PRIVATE
         PWT_SOURCE_COMMIT="${PWT_SOURCE_COMMIT}"
+        CYW43_ENABLE_BLUETOOTH=1
+        CYW43_LWIP=0
 )
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    # Keep the strict warning gate on picoWutooth-owned sources only. The SDK's
+    # INTERFACE libraries compile upstream sources into this target as well.
     set_source_files_properties(
         firmware/main.c
+        firmware/usb_hci_app.c
         firmware/controller_stub.c
         firmware/usb_descriptor_data.c
         firmware/usb_descriptors.c
         firmware/usb_hci_router.c
         firmware/usb_hci_tinyusb.c
+        src/hci_transport.c
+        src/cyw43_hci_backend.c
         PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Wpedantic;-Werror"
     )
 endif()
 
+# PWT-002 and PWT-003 remain independent controller and USB halves here.
+# PWT-004 owns the bridge between them; neither half silently absorbs the other.
 pico_enable_stdio_usb(picowutooth 0)
 pico_enable_stdio_uart(picowutooth 0)
 

@@ -40,6 +40,47 @@ Important current upstream facts to verify against the pinned revision:
 
 Do not assume a `master` source line remains unchanged; record the pinned SDK revision in the build.
 
+## PWT-002 pinned CYW43 controller contract
+
+PWT-002 was implemented against the exact foundation revisions above. The
+non-obvious controller-only decisions are grounded in these pinned source files:
+
+- Pico SDK `pico/cyw43_driver.h` and `cyw43_driver.c` at
+  `079c6f39023649b154152db30f1d781e884879bc`: public async-context
+  `cyw43_driver_init/deinit`, OTP/board-unique WLAN MAC handling;
+- Pico SDK `pico/cyw43_arch.h` / arch implementations at that revision: users
+  may create their own async context and add CYW43 driver support directly;
+- CYW43 driver `src/cyw43.h` and `src/cyw43_ctrl.c` at
+  `055d64274b014dd7b1c2fc94d26e8a18face7124`:
+  `cyw43_bluetooth_hci_init/read/write` are the public raw-HCI boundary and
+  initialization loads the Bluetooth shared-bus firmware;
+- Pico SDK `btstack_hci_transport_cyw43.c` at the pinned SDK revision: the
+  transport reserves a four-byte CYW43 header, stores packet type in byte 3,
+  derives Bluetooth identity from the WLAN MAC by incrementing octet 5, and
+  programs the address for safety when OTP is absent;
+- Pico SDK `btstack_chipset_cyw43.c` at the pinned SDK revision: the CYW43
+  chipset Write_BD_ADDR command is vendor opcode `0xfc01` with six reversed
+  address bytes;
+- Pico SDK `cybt_shared_bus/cybt_shared_bus.c` at the pinned SDK revision:
+  bytes 0..2 of the four-byte header are the little-endian HCI payload length
+  and the shared-bus implementation uses packet types Command `0x01`, ACL
+  `0x02`, Event `0x04`.
+
+picoWutooth intentionally does not use `pico_btstack_cyw43` or
+`btstack_hci_transport_cyw43_instance()` as its production boundary because
+those facilities integrate BTstack host/run-loop ownership. picoWutooth needs
+only the controller transport.
+
+Known pinned-upstream caveat: `cybt_hci_write_buf()` can detect
+`CYBT_ERR_QUEUE_FULL`, but `cyw43_btbus_write()` does not propagate that
+return value and the public `cyw43_bluetooth_hci_write()` consequently cannot
+report that specific internal queue-full condition. PWT-002 preserves the
+supported public API instead of forking/copying private driver code; PWT-004 owns
+bridge-level backpressure and PWT-005 provides physical stress evidence.
+
+These source observations are API/implementation evidence, not physical
+Bluetooth acceptance.
+
 ## TinyUSB
 
 - TinyUSB repository:  
@@ -68,6 +109,7 @@ Important current upstream facts to verify against the pinned revision:
 PWT-003 additionally carries `patches/tinyusb-bth-no-iso.patch` against exact TinyUSB commit `86ad6e56c1700e85f1c5678607a762cfe3aa2f47`. At this revision, `btd_open()` unconditionally walks a first ISO/voice interface and the class state contains an array sized by `CFG_TUD_BTH_ISO_ALT_COUNT`; that prevents a primary-controller-only descriptor from operating correctly with the required value `0`. The local patch compiles out only those voice fields and parsing paths when the count is zero. The SDK fetch helpers apply it idempotently after verifying the exact upstream commit, and the build manifest records the patch SHA-256.
 
 The same pinned TinyUSB CMake aggregate does not include `src/class/bth/bth_device.c` in its device source list. With `CFG_TUD_BTH=1`, `usbd.c` registers the BTH driver but would otherwise leave its symbols unresolved. picoWutooth therefore adds that exact pinned upstream source to the firmware target explicitly; it is not vendored or reimplemented. Removal condition for both integration workarounds: adopt an upstream/Pico SDK combination that includes the BTH source and natively supports `CFG_TUD_BTH_ISO_ALT_COUNT=0`, then pass the same descriptor/routing and cross-build gates without the local accommodations.
+
 
 A historical TinyUSB/Mynewt example demonstrates the intended model: enumerate the MCU as a Bluetooth controller and let a host OS scan/connect through its native stack:
 https://github.com/hathach/mynewt-tinyusb-example
