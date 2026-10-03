@@ -30,7 +30,7 @@ jobs:
       - name: Check Linux acceptance harness syntax
         run: |
           bash -n tools/pwt005-linux-capture.sh
-          tools/pwt005-linux-capture.sh --help >/dev/null
+          bash tools/pwt005-linux-capture.sh --help >/dev/null
 
       - name: Configure native tests
         run: cmake -S . -B build-native -G Ninja -DPWT_BUILD_NATIVE_TESTS=ON -DCMAKE_BUILD_TYPE=Release
