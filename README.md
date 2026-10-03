@@ -16,7 +16,7 @@ Bluetooth devices
 
 ## Programme status
 
-The repository now has a reproducible firmware/build/test foundation. **No Bluetooth behaviour is claimed by the foundation firmware.** CYW43 controller bring-up, the TinyUSB Bluetooth HCI class, their integration, and physical-host acceptance are separate programme issues.
+The repository has a reproducible firmware/build/test foundation and a USB-facing TinyUSB Bluetooth HCI implementation behind a deterministic synthetic controller seam. **No real CYW43, RF, Linux, or Windows acceptance is claimed by that synthetic backend.** CYW43 controller bring-up remains separate, and the production bridge plus physical-host acceptance are later programme issues.
 
 The MVP targets a single-purpose USB Bluetooth HCI device, with Linux used first for protocol-level diagnostics and Windows 11 as the primary generic-dongle acceptance target. BLE is the first functional milestone; BR/EDR follows. Wi-Fi coexistence, USB composite debug interfaces, and SCO/ISO audio are deliberately deferred until the basic controller path is stable.
 

@@ -76,6 +76,21 @@ MVP endpoint roles:
 
 Do not add CDC, HID, vendor-specific or other production interfaces during MVP. If debug USB is useful during development, use a separate compile-time diagnostic build and prove that it cannot be confused with acceptance firmware.
 
+### PWT-003 concrete USB contract
+
+The PWT-003 production topology fixes the USB-facing contract to one primary Bluetooth HCI interface with no alternate settings:
+
+- device and interface class/subclass/protocol: `0xE0 / 0x01 / 0x01`;
+- HCI event endpoint: `0x81`, interrupt IN, 16-byte Full-Speed max packet;
+- ACL controller→host endpoint: `0x82`, bulk IN, 64-byte Full-Speed max packet;
+- ACL host→controller endpoint: `0x02`, bulk OUT, 64-byte Full-Speed max packet;
+- no CDC, HID, vendor, IAD/composite companion, SCO/ISO interface or isochronous endpoint;
+- `CFG_TUD_BTH_ISO_ALT_COUNT=0`.
+
+The current engineering VID/PID is `0xCAFE:0x4013`. This is a provisional development identity, not a claim that picoWutooth owns an allocated USB vendor/product ID. Release hardening must replace it with an appropriately allocated identity without changing the single-purpose class topology.
+
+The pinned TinyUSB BTH driver revision otherwise assumes at least one ISO/voice interface in `btd_open()` even when `CFG_TUD_BTH_ISO_ALT_COUNT` is zero. picoWutooth therefore applies the narrow, revision-locked patch `patches/tinyusb-bth-no-iso.patch`, which gates only the voice-interface storage/parsing when the ISO alternative count is zero. The primary TinyUSB BTH class driver and command/event/ACL APIs remain upstream. Remove the patch once the pinned/upgraded TinyUSB revision natively supports a zero-ISO primary controller and the descriptor tests remain green.
+
 ## CYW43 transport boundary
 
 The Pico SDK exposes low-level Bluetooth HCI support for CYW43. Its upstream CYW43 HCI transport documents a mandatory four-byte packet header in front of the actual HCI packet, with HCI packet type stored in the fourth byte.

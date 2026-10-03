@@ -9,6 +9,7 @@ BTSTACK_COMMIT="eb0bb8b5ea6d234ccb940313b47f7a5c3b4e20ec"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SDK_DIR="${PICO_SDK_PATH:-${ROOT_DIR}/.deps/pico-sdk}"
+TINYUSB_PATCH="${ROOT_DIR}/patches/tinyusb-bth-no-iso.patch"
 
 mkdir -p "$(dirname "${SDK_DIR}")"
 
@@ -43,8 +44,17 @@ verify_commit "${SDK_DIR}/lib/tinyusb" "${TINYUSB_COMMIT}"
 verify_commit "${SDK_DIR}/lib/cyw43-driver" "${CYW43_COMMIT}"
 verify_commit "${SDK_DIR}/lib/btstack" "${BTSTACK_COMMIT}"
 
+if git -C "${SDK_DIR}/lib/tinyusb" apply --check "${TINYUSB_PATCH}"; then
+    git -C "${SDK_DIR}/lib/tinyusb" apply "${TINYUSB_PATCH}"
+elif git -C "${SDK_DIR}/lib/tinyusb" apply --reverse --check "${TINYUSB_PATCH}"; then
+    echo "TinyUSB no-ISO patch already applied"
+else
+    echo "error: TinyUSB worktree does not accept the pinned picoWutooth patch cleanly" >&2
+    exit 1
+fi
+
 echo "Pico SDK ready: ${SDK_DIR}"
 echo "  pico-sdk:     ${SDK_COMMIT}"
-echo "  tinyusb:      ${TINYUSB_COMMIT}"
+echo "  tinyusb:      ${TINYUSB_COMMIT} + picoWutooth no-ISO patch"
 echo "  cyw43-driver: ${CYW43_COMMIT}"
 echo "  btstack:      ${BTSTACK_COMMIT}"

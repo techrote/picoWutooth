@@ -65,6 +65,8 @@ Important current upstream facts to verify against the pinned revision:
 - ISO alternatives are not required for the MVP and should remain absent/zero unless a later audio issue deliberately changes that;
 - consult the pinned release notes for Bluetooth-HCI bug fixes such as ACL IN zero-length-packet handling.
 
+PWT-003 additionally carries `patches/tinyusb-bth-no-iso.patch` against exact TinyUSB commit `86ad6e56c1700e85f1c5678607a762cfe3aa2f47`. At this revision, `btd_open()` unconditionally walks a first ISO/voice interface and the class state contains an array sized by `CFG_TUD_BTH_ISO_ALT_COUNT`; that prevents a primary-controller-only descriptor from operating correctly with the required value `0`. The local patch compiles out only those voice fields and parsing paths when the count is zero. The SDK fetch helpers apply it idempotently after verifying the exact upstream commit, and the build manifest records the patch SHA-256. Removal condition: adopt an upstream revision that supports `CFG_TUD_BTH_ISO_ALT_COUNT=0` without the local patch and passes the same descriptor/routing tests.
+
 A historical TinyUSB/Mynewt example demonstrates the intended model: enumerate the MCU as a Bluetooth controller and let a host OS scan/connect through its native stack:
 https://github.com/hathach/mynewt-tinyusb-example
 
