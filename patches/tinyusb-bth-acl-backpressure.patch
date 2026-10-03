@@ -1,7 +1,7 @@
 diff --git a/src/class/bth/bth_device.h b/src/class/bth/bth_device.h
 --- a/src/class/bth/bth_device.h
 +++ b/src/class/bth/bth_device.h
-@@ -82,6 +82,13 @@ bool tud_bt_event_send(void *event, uint16_t event_len);
+@@ -82,6 +82,12 @@ bool tud_bt_event_send(void *event, uint16_t event_len);
  // and must not be reused till tud_bt_acl_data_sent_cb() is called.
  bool tud_bt_acl_data_send(void *acl_data, uint16_t data_len);
  
