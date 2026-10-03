@@ -1,5 +1,0 @@
-phase=initial
-utc_timestamp=20261003T182349Z
-hostname=localhost
-kernel=Linux 6.18.52-0-lts x86_64 Linux
-repository_commit=46200a0910c376831d33e90ff05b6cf4078ce538
