@@ -12,8 +12,8 @@ PWT-001 pins the dependency set used by the project foundation:
 | TinyUSB (SDK submodule) | `86ad6e56c1700e85f1c5678607a762cfe3aa2f47` |
 | CYW43 driver (SDK submodule) | `055d64274b014dd7b1c2fc94d26e8a18face7124` |
 | BTstack (SDK submodule) | `eb0bb8b5ea6d234ccb940313b47f7a5c3b4e20ec` |
-| GitHub `actions/checkout` | `11bd71901bbe5b1630ceea73d27597364c9af683` (v4.2.2) |
-| GitHub `actions/upload-artifact` | `ea165f8d65b6e75b540449e92b4886f43607fa02` (v4.6.2) |
+| GitHub `actions/checkout` | `3d3c42e5aac5ba805825da76410c181273ba90b1` (v7.0.1) |
+| GitHub `actions/upload-artifact` | `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` (v7.0.1) |
 
 The SDK release was selected as the current stable Raspberry Pi release at foundation time (published 2026-09-04). The repository helper scripts verify the SDK and the three Bluetooth-relevant submodule SHAs after checkout instead of trusting a floating tag or branch.
 
