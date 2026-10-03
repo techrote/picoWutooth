@@ -21,6 +21,7 @@ typedef struct {
     uint32_t backend_rejected;
     uint32_t host_ingress_busy_retries;
     uint32_t malformed_host_packets;
+    uint32_t controller_packets_copied;
     uint32_t controller_packets_sent;
     uint32_t usb_busy_retries;
     uint32_t malformed_controller_packets;
@@ -42,11 +43,18 @@ typedef struct {
     uint16_t acl_expected_length;
     bool acl_complete_pending;
 
-    pwt_hci_packet_view_t pending;
-    bool pending_valid;
-    bool pending_submitted;
-    bool recovery_required;
+    /*
+     * TinyUSB may retain an IN transfer buffer until its completion callback.
+     * Copy controller data here before releasing the backend queue slot so
+     * controller reset/recovery can never recycle memory owned by USB.
+     */
+    uint8_t pending_to_usb[PWT_HCI_MAX_PAYLOAD];
+    pwt_hci_packet_kind_t pending_to_usb_kind;
+    uint16_t pending_to_usb_length;
+    bool pending_to_usb_valid;
+    bool pending_to_usb_submitted;
 
+    bool recovery_required;
     pwt_usb_hci_stats_t stats;
 } pwt_usb_hci_router_t;
 
