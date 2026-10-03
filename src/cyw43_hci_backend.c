@@ -61,7 +61,7 @@ static int pwt_cyw43_read_raw(
     size_t capacity,
     size_t *length) {
     (void)context;
-    if (capacity > UINT32_MAX || length == NULL) {
+    if (length == NULL) {
         return -1;
     }
     uint32_t cyw43_length = 0u;
