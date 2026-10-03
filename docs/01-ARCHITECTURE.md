@@ -108,6 +108,12 @@ The real implementation may use spans/ring slots rather than copying this struct
 - Packet kind is derived from the USB transfer path on host→controller traffic and from CYW43 packet metadata on controller→host traffic.
 - Tests must detect double-prefixing, missing prefix, wrong packet type and length mismatch.
 
+PWT-002 bounds one typed HCI packet to 2048 payload bytes, plus the private
+four-byte CYW43 pre-header. This deliberately exceeds the expected CYW43439 ACL
+frame size while remaining well below the pinned shared-bus 4096-byte ring. The
+physical controller's reported buffer sizes remain an acceptance datum, not an
+assumption baked into USB behavior.
+
 ## Controller initialization
 
 PWT-002 selects a controller-only boundary from the pinned Pico SDK instead of
@@ -116,6 +122,12 @@ creates an `async_context_threadsafe_background_t`, attaches the public
 `pico_cyw43_driver` integration with `cyw43_driver_init()`, then uses the
 CYW43 driver's public `cyw43_bluetooth_hci_init/read/write` functions. Wi-Fi
 and lwIP remain disabled.
+
+The CYW43 driver also expects the application to provide
+`cyw43_bluetooth_hci_process()` when Bluetooth is compiled in. The SDK's
+BTstack transport normally supplies that notification hook; picoWutooth supplies
+its own minimal pull-transport hook instead, so satisfying the driver callback
+does not import BTstack host/run-loop ownership.
 
 This deliberately does **not** call `cyw43_arch_init()` with Bluetooth enabled:
 in the pinned SDK that arch helper conditionally installs
