@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  native-tests:
+    name: Native tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build
+
+      - name: Configure native tests
+        run: cmake -S . -B build-native -G Ninja -DPWT_BUILD_NATIVE_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build native tests
+        run: cmake --build build-native --parallel 2
+
+      - name: Run native tests
+        run: ctest --test-dir build-native --output-on-failure
+
+  firmware:
+    name: Pico W firmware
+    runs-on: ubuntu-24.04
+    env:
+      PICO_SDK_PATH: ${{ github.workspace }}/.deps/pico-sdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install ARM build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            ninja-build \
+            gcc-arm-none-eabi \
+            libnewlib-arm-none-eabi
+
+      - name: Fetch pinned Pico SDK and submodules
+        run: bash tools/fetch-pico-sdk.sh
+
+      - name: Configure firmware
+        run: |
+          cmake -S . -B build-firmware -G Ninja \
+            -DPICO_SDK_PATH="$PICO_SDK_PATH" \
+            -DPICO_BOARD=pico_w \
+            -DPWT_SOURCE_COMMIT="$GITHUB_SHA" \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build firmware
+        run: cmake --build build-firmware --target picowutooth --parallel 2
+
+      - name: Write build manifest
+        run: bash tools/write-build-manifest.sh build-firmware/picowutooth.uf2 build-firmware/build-manifest.txt
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: picowutooth-firmware-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            build-firmware/picowutooth.uf2
+            build-firmware/build-manifest.txt
