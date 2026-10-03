@@ -108,20 +108,65 @@ The real implementation may use spans/ring slots rather than copying this struct
 - Packet kind is derived from the USB transfer path on host→controller traffic and from CYW43 packet metadata on controller→host traffic.
 - Tests must detect double-prefixing, missing prefix, wrong packet type and length mismatch.
 
+PWT-002 bounds one typed HCI packet to 2048 payload bytes, plus the private
+four-byte CYW43 pre-header. This deliberately exceeds the expected CYW43439 ACL
+frame size while remaining well below the pinned shared-bus 4096-byte ring. The
+physical controller's reported buffer sizes remain an acceptance datum, not an
+assumption baked into USB behavior.
+
 ## Controller initialization
 
-The controller must reach a defined `READY` state before normal bridged host traffic is accepted.
+PWT-002 selects a controller-only boundary from the pinned Pico SDK instead of
+linking the SDK's BTstack HCI transport into production firmware. The firmware
+creates an `async_context_threadsafe_background_t`, attaches the public
+`pico_cyw43_driver` integration with `cyw43_driver_init()`, then uses the
+CYW43 driver's public `cyw43_bluetooth_hci_init/read/write` functions. Wi-Fi
+and lwIP remain disabled.
 
-The implementation must identify and document the supported Pico SDK initialization boundary rather than cargo-culting private internals. Preferred order:
+The CYW43 driver also expects the application to provide
+`cyw43_bluetooth_hci_process()` when Bluetooth is compiled in. The SDK's
+BTstack transport normally supplies that notification hook; picoWutooth supplies
+its own minimal pull-transport hook instead, so satisfying the driver callback
+does not import BTstack host/run-loop ownership.
 
-1. use public Pico SDK/CYW43 initialization facilities;
-2. use an upstream-exposed HCI transport abstraction if it permits a host-stack-free controller path;
-3. only use lower-level CYW43 functions when necessary and wrap them locally;
-4. do not fork/copy the CYW43 driver merely to bypass a small adapter problem.
+This deliberately does **not** call `cyw43_arch_init()` with Bluetooth enabled:
+in the pinned SDK that arch helper conditionally installs
+`btstack_cyw43_init()`, which would add BTstack host/run-loop ownership that
+picoWutooth does not need. The Pico SDK explicitly permits applications to
+create their own async context and add CYW43 driver support directly.
 
-The exact initialization sequence is owned by PWT-002 and becomes an architectural contract once proven.
+The controller startup contract is:
 
-Windows `BthUsb.sys` must not be expected to perform Pico-specific or Broadcom-specific firmware bootstrap.
+1. initialize the background async context;
+2. call `cyw43_driver_init()`;
+3. call `cyw43_bluetooth_hci_init()`, which loads the CYW43439 Bluetooth
+   firmware and initializes the shared Bluetooth bus;
+4. obtain the board WLAN MAC through `cyw43_wifi_get_mac()`;
+5. derive the Bluetooth public address exactly as the pinned SDK transport does:
+   copy the WLAN address and increment octet 5;
+6. issue HCI Reset (`0x0c03`) and require a successful Command Complete;
+7. issue the CYW43/Broadcom Write_BD_ADDR vendor command (`0xfc01`) with the
+   derived address and require a successful Command Complete;
+8. only then expose `CONTROLLER_READY`.
+
+The address source is not project-global. The CYW43 driver uses the device OTP
+MAC when present and, if OTP lacks a MAC, its pinned Pico integration derives a
+locally administered unicast MAC from the Pico unique board ID. This avoids the
+controller firmware's documented fixed fallback address when OTP is absent.
+
+Bootstrap Command Complete waits are bounded to 1000 one-millisecond attempts.
+Initialization, framing or backend failures put the adapter in `ERROR`; normal
+TX/RX is rejected until the adapter is fully reset or deinitialized. Adapter
+reset tears down the CYW43 driver and async context and then repeats the complete
+startup contract. Deinitialization removes the CYW43 driver from the async
+context before destroying that context.
+
+A later host HCI Reset is ordinary bridged HCI traffic; it is distinct from the
+adapter's full transport-recovery reset.
+
+Compilation proves only that this lifecycle matches the pinned SDK API. Physical
+controller readiness, reported BD_ADDR and RF behavior remain PWT-005 acceptance
+work.
 
 ## State model
 
@@ -168,6 +213,13 @@ The bridge is asynchronous in both directions. Correctness requirements:
 
 Backpressure policy must be testable without physical radio hardware.
 
+PWT-002 also records one pinned-upstream limitation: the CYW43 shared-bus
+implementation detects an internal TX queue-full condition, but its public
+`cyw43_bluetooth_hci_write()` path does not propagate that internal result to
+the caller. PWT-002 does not copy private CYW43 code to bypass this. PWT-004 must
+therefore serialize bridge submission conservatively and own end-to-end
+backpressure/retry policy; physical stress acceptance must revisit this boundary.
+
 Prefer queues of complete HCI packets or length-delimited ring slots over arbitrary byte FIFOs that can lose framing after one corruption.
 
 ## Concurrency
@@ -187,9 +239,16 @@ Any cross-context queue must document:
 
 ## Bluetooth address and controller identity
 
-PWT-002/PWT-005 must verify how the selected initialization path obtains or establishes a unique Bluetooth address and controller identity. Do not hard-code a globally reused BD_ADDR.
+PWT-002 establishes the firmware-side identity rule: use the CYW43 driver's
+device-specific WLAN MAC and program Bluetooth to WLAN MAC + 1 using the same
+octet-5 increment used by the pinned Pico SDK CYW43 BTstack transport. Never
+hard-code a shared BD_ADDR.
 
-Record HCI `Read Local Version Information`, supported commands/features, buffer sizes and BD_ADDR during physical acceptance so future regressions can distinguish firmware/controller changes from bridge changes.
+PWT-005 must still read the controller's BD_ADDR on physical hardware and prove
+that the exact candidate reports the intended non-shared identity. It must also
+record HCI `Read Local Version Information`, supported commands/features and
+buffer sizes so future regressions can distinguish firmware/controller changes
+from bridge changes.
 
 ## Full-Speed USB constraints
 
