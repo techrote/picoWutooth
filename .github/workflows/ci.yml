@@ -56,7 +56,8 @@ jobs:
             cmake \
             ninja-build \
             gcc-arm-none-eabi \
-            libnewlib-arm-none-eabi
+            libnewlib-arm-none-eabi \
+            libstdc++-arm-none-eabi-newlib
 
       - name: Fetch pinned Pico SDK and submodules
         run: bash tools/fetch-pico-sdk.sh
