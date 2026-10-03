@@ -5,6 +5,8 @@ option(PWT_BUILD_NATIVE_TESTS "Build host-native picoWutooth tests instead of fi
 if(PWT_BUILD_NATIVE_TESTS)
     project(picowutooth_native_tests LANGUAGES C)
 
+    set(CMAKE_C_STANDARD 11)
+    set(CMAKE_C_STANDARD_REQUIRED ON)
     enable_testing()
     add_subdirectory(tests)
     return()
@@ -41,30 +43,43 @@ pico_sdk_init()
 
 add_executable(picowutooth
     firmware/main.c
+    src/hci_transport.c
+    src/cyw43_hci_backend.c
+)
+
+target_include_directories(picowutooth
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
 target_link_libraries(picowutooth
     PRIVATE
         pico_stdlib
+        pico_cyw43_driver
+        cyw43_driver_picow
+        pico_async_context_threadsafe_background
 )
 
 target_compile_definitions(picowutooth
     PRIVATE
         PWT_SOURCE_COMMIT="${PWT_SOURCE_COMMIT}"
+        CYW43_ENABLE_BLUETOOTH=1
+        CYW43_LWIP=0
 )
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    # Pico SDK sources are compiled as part of the final target, so target-wide
-    # warning flags would also police third-party code. Keep the strict gate on
-    # picoWutooth-owned sources only.
+    # Keep the strict warning gate on picoWutooth-owned sources only. The SDK's
+    # INTERFACE libraries compile upstream sources into this target as well.
     set_source_files_properties(
         firmware/main.c
+        src/hci_transport.c
+        src/cyw43_hci_backend.c
         PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Wpedantic;-Werror"
     )
 endif()
 
-# The MVP production firmware must not accidentally grow a CDC/USB stdio
-# interface. PWT-003 owns the eventual single-purpose Bluetooth HCI USB class.
+# PWT-003 owns the eventual single-purpose Bluetooth HCI USB class. PWT-002
+# initializes only the CYW43-facing controller transport and adds no USB surface.
 pico_enable_stdio_usb(picowutooth 0)
 pico_enable_stdio_uart(picowutooth 0)
 
