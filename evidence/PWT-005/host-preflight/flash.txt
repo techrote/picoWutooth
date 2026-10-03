@@ -1,5 +1,0 @@
-utc=2026-10-03T18:21:47.7883621Z
-source_commit=46200a0910c376831d33e90ff05b6cf4078ce538
-uf2_sha256=3db3f50cb0925e4f6bb80e8bafde8d75ccbacb3d4fd513e763ceeb6902058edd
-method=verified UF2 copy to E: RPI-RP2 after 1200 baud touch
-preflash_serial=504450611827BE1C
