@@ -10,6 +10,18 @@
 
 static void pwt_cyw43_stop(void *context);
 
+/*
+ * The CYW43 driver invokes this application hook from its async poll path when
+ * Bluetooth work is pending. The BTstack transport normally supplies it. Our
+ * controller-only adapter is deliberately pull-driven, so the hook only records
+ * that a later read should drain HCI data; it must not install a host run loop.
+ */
+static volatile bool pwt_cyw43_rx_pending;
+
+void cyw43_bluetooth_hci_process(void) {
+    pwt_cyw43_rx_pending = true;
+}
+
 static int pwt_cyw43_start(void *context) {
     pwt_cyw43_hci_backend_t *backend = (pwt_cyw43_hci_backend_t *)context;
     if (backend == NULL) {
@@ -66,6 +78,7 @@ static int pwt_cyw43_read_raw(
     }
     uint32_t cyw43_length = 0u;
     const int result = cyw43_bluetooth_hci_read(frame, (uint32_t)capacity, &cyw43_length);
+    pwt_cyw43_rx_pending = cyw43_length != 0u;
     *length = (size_t)cyw43_length;
     return result;
 }
