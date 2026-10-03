@@ -49,11 +49,12 @@ static pwt_hci_status_t pwt_encode_frame(
     return PWT_HCI_OK;
 }
 
-static pwt_hci_status_t pwt_decode_frame(
+static pwt_hci_status_t pwt_validate_frame(
     const uint8_t *frame,
     size_t frame_length,
-    pwt_hci_packet_t *packet) {
-    if (frame == NULL || packet == NULL) {
+    pwt_hci_packet_kind_t *kind,
+    size_t *payload_length) {
+    if (frame == NULL || kind == NULL || payload_length == NULL) {
         return PWT_HCI_E_ARGUMENT;
     }
     if (frame_length < PWT_CYW43_HEADER_SIZE) {
@@ -74,10 +75,31 @@ static pwt_hci_status_t pwt_decode_frame(
         return PWT_HCI_E_MALFORMED;
     }
 
-    packet->kind = (pwt_hci_packet_kind_t)frame[3];
-    packet->length = (uint16_t)declared_length;
-    if (declared_length != 0u) {
-        memcpy(packet->payload, &frame[PWT_CYW43_HEADER_SIZE], declared_length);
+    *kind = (pwt_hci_packet_kind_t)frame[3];
+    *payload_length = declared_length;
+    return PWT_HCI_OK;
+}
+
+static pwt_hci_status_t pwt_decode_frame(
+    const uint8_t *frame,
+    size_t frame_length,
+    pwt_hci_packet_t *packet) {
+    if (packet == NULL) {
+        return PWT_HCI_E_ARGUMENT;
+    }
+
+    pwt_hci_packet_kind_t kind;
+    size_t payload_length = 0u;
+    pwt_hci_status_t status = pwt_validate_frame(
+        frame, frame_length, &kind, &payload_length);
+    if (status != PWT_HCI_OK) {
+        return status;
+    }
+
+    packet->kind = kind;
+    packet->length = (uint16_t)payload_length;
+    if (payload_length != 0u) {
+        memcpy(packet->payload, &frame[PWT_CYW43_HEADER_SIZE], payload_length);
     }
     return PWT_HCI_OK;
 }
@@ -123,34 +145,50 @@ static pwt_hci_status_t pwt_wait_command_complete(
     pwt_hci_transport_t *transport,
     uint16_t expected_opcode) {
     for (uint32_t attempt = 0u; attempt < PWT_INIT_WAIT_ITERATIONS; ++attempt) {
-        pwt_hci_packet_t packet;
-        pwt_hci_status_t status = pwt_read_raw_packet(transport, &packet);
-        if (status == PWT_HCI_NO_DATA) {
+        size_t frame_length = 0u;
+        if (transport->backend->read_raw(
+                transport->backend_context,
+                transport->rx_frame,
+                sizeof(transport->rx_frame),
+                &frame_length) != 0) {
+            return PWT_HCI_E_TRANSPORT;
+        }
+        if (frame_length == 0u) {
             transport->backend->delay_ms(transport->backend_context, 1u);
             continue;
         }
+        if (frame_length > sizeof(transport->rx_frame)) {
+            return PWT_HCI_E_OVERSIZE;
+        }
+
+        pwt_hci_packet_kind_t kind;
+        size_t payload_length = 0u;
+        pwt_hci_status_t status = pwt_validate_frame(
+            transport->rx_frame, frame_length, &kind, &payload_length);
         if (status != PWT_HCI_OK) {
             return status;
         }
-        if (packet.kind != PWT_HCI_PACKET_EVENT) {
-            return PWT_HCI_E_MALFORMED;
-        }
-        if (packet.length < 2u || (size_t)packet.payload[1] + 2u != packet.length) {
-            return PWT_HCI_E_MALFORMED;
-        }
-        if (packet.payload[0] != PWT_HCI_EVENT_COMMAND_COMPLETE) {
-            continue;
-        }
-        if (packet.length < 6u || packet.payload[1] < 4u) {
+        if (kind != PWT_HCI_PACKET_EVENT) {
             return PWT_HCI_E_MALFORMED;
         }
 
-        const uint16_t opcode = (uint16_t)packet.payload[3] |
-                                ((uint16_t)packet.payload[4] << 8u);
+        const uint8_t *payload = &transport->rx_frame[PWT_CYW43_HEADER_SIZE];
+        if (payload_length < 2u || (size_t)payload[1] + 2u != payload_length) {
+            return PWT_HCI_E_MALFORMED;
+        }
+        if (payload[0] != PWT_HCI_EVENT_COMMAND_COMPLETE) {
+            continue;
+        }
+        if (payload_length < 6u || payload[1] < 4u) {
+            return PWT_HCI_E_MALFORMED;
+        }
+
+        const uint16_t opcode = (uint16_t)payload[3] |
+                                ((uint16_t)payload[4] << 8u);
         if (opcode != expected_opcode) {
             continue;
         }
-        return packet.payload[5] == 0u ? PWT_HCI_OK : PWT_HCI_E_CONTROLLER;
+        return payload[5] == 0u ? PWT_HCI_OK : PWT_HCI_E_CONTROLLER;
     }
     return PWT_HCI_E_TIMEOUT;
 }
