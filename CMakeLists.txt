@@ -44,7 +44,7 @@ pico_sdk_init()
 add_executable(picowutooth
     firmware/main.c
     firmware/usb_hci_app.c
-    firmware/controller_stub.c
+    firmware/controller_bridge.c
     firmware/usb_descriptor_data.c
     firmware/usb_descriptors.c
     firmware/usb_hci_router.c
@@ -90,7 +90,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     set_source_files_properties(
         firmware/main.c
         firmware/usb_hci_app.c
-        firmware/controller_stub.c
+        firmware/controller_bridge.c
         firmware/usb_descriptor_data.c
         firmware/usb_descriptors.c
         firmware/usb_hci_router.c
