@@ -27,6 +27,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends cmake ninja-build
 
+      - name: Check Linux acceptance harness syntax
+        run: |
+          bash -n tools/pwt005-linux-capture.sh
+          bash -n tools/pwt005-le-connect.sh
+          bash tools/pwt005-linux-capture.sh --help >/dev/null
+          bash tools/test-pwt005-linux-capture.sh
+
       - name: Configure native tests
         run: cmake -S . -B build-native -G Ninja -DPWT_BUILD_NATIVE_TESTS=ON -DCMAKE_BUILD_TYPE=Release
 

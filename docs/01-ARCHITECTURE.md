@@ -282,6 +282,11 @@ endpoint only when its ACL assembly/bridge path can retain the next transfer.
 When it cannot, leaving OUT unarmed causes normal USB NAK backpressure; no
 received fragment is discarded.
 
+The application's ACL OUT service runs only while `tud_mounted()` is true.
+Before USB configuration, or after a bus reset removes configuration, TinyUSB
+has no BTH OUT endpoint to arm. That normal lifecycle state must not be treated
+as a transport fault or initiate controller recovery before enumeration.
+
 HCI commands arrive over EP0 through a TinyUSB callback that cannot be
 retroactively NAKed. The router therefore owns one complete pending-command
 slot in addition to the two bridge command slots. HCI command-credit semantics

@@ -145,6 +145,20 @@ PWT-004 ACL-backpressure patch SHA-256.
 A historical TinyUSB/Mynewt example demonstrates the intended model: enumerate the MCU as a Bluetooth controller and let a host OS scan/connect through its native stack:
 https://github.com/hathach/mynewt-tinyusb-example
 
+## Linux acceptance tooling
+
+BlueZ's standard `btmgmt` management client has no controlled `connect`
+command. PWT-005 uses the standard BlueZ `hcitool lecc` utility for an HCI LE
+connection, with explicit peer public/random address type, while `btmgmt`
+records connection info and disconnects. On BlueZ 5.86, `--random` sets the
+peer address type; `--static` changes the local address type and must not be
+substituted for it. This is an HCI link smoke test, not GATT/profile acceptance.
+
+- BlueZ 5.86 command implementation:
+  https://github.com/bluez/bluez/blob/5.86/tools/hcitool.c
+- BlueZ management client:
+  https://github.com/bluez/bluez/blob/5.86/tools/btmgmt.c
+
 ## Microsoft Windows
 
 - USB device class drivers included in Windows:  
